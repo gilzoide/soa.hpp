@@ -178,41 +178,17 @@ public:
 		});
 	}
 	template<typename InputIt>
-	soa(InputIt first, InputIt last) : soa() {
+	soa(InputIt first, InputIt last) : vectors() {
 		insert(end(), first, last);
 	}
-	soa(const soa& other) {
-		reflect::for_each<T>([&](auto I) {
-			get_vector<I>() = field_vector<I>(other.get_vector<I>());
-		});
-	}
-	soa(soa&& other) {
-		reflect::for_each<T>([&](auto I) {
-			get_vector<I>() = field_vector<I>(std::move(other.get_vector<I>()));
-		});
-	}
-	soa(std::initializer_list<T> ilist) : soa() {
+	soa(const soa& other) = default;
+	soa(soa&& other) = default;
+	soa(std::initializer_list<T> ilist) : vectors() {
 		insert(end(), ilist);
 	}
 
-	soa& operator=(const soa& other) {
-		if (this != &other) {
-			reflect::for_each<T>([&](auto I) {
-				auto&& vec = get_vector<I>();
-				*vec = *other.get_vector<I>();
-			});
-		}
-		return *this;
-	}
-	soa& operator=(soa&& other) {
-		if (this != &other) {
-			reflect::for_each<T>([&](auto I) {
-				auto&& vec = get_vector<I>();
-				*vec = std::move(other.get_vector<I>());
-			});
-		}
-		return *this;
-	}
+	soa& operator=(const soa& other) = default;
+	soa& operator=(soa&& other) = default;
 	soa& operator=(std::initializer_list<T> ilist) {
 		assign(ilist);
 		return *this;

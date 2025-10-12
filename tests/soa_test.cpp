@@ -15,6 +15,17 @@ struct Foo {
 };
 using FooSoA = soa::soa<Foo>;
 
+template<typename Iterable1, typename Iterable2>
+void REQUIRE_EQUALS(const Iterable1& iterable1, const Iterable2& iterable2) {
+	auto it1 = iterable1.begin();
+	auto it2 = iterable2.begin();
+	for ( ; it1 != iterable1.end() && it2 != iterable2.end(); ++it1, ++it2) {
+		REQUIRE(*it1 == *it2);
+	}
+	REQUIRE(it1 == iterable1.end());
+	REQUIRE(it2 == iterable2.end());
+}
+
 TEST_CASE("soa<Foo>") {
 	Foo foo1(1, "hello 1");
 	Foo foo2(2, "hello 2");
@@ -53,6 +64,8 @@ TEST_CASE("soa<Foo>") {
 		REQUIRE((*soa[0]).i == foo_array[0].i);
 		REQUIRE((*soa[1]).i == foo_array[1].i);
 		REQUIRE((*soa[2]).i == foo_array[2].i);
+
+		REQUIRE_EQUALS(soa, foo_array);
 	}
 	SECTION("soa(initializer_list)", "[constructor]") {
 		FooSoA soa(foo_ilist);
@@ -62,6 +75,19 @@ TEST_CASE("soa<Foo>") {
 		REQUIRE((*soa[0]).i == foo1.i);
 		REQUIRE((*soa[1]).i == foo2.i);
 		REQUIRE((*soa[2]).i == foo3.i);
+
+		REQUIRE_EQUALS(soa, foo_ilist);
+	}
+	SECTION("soa(const soa&)", "[constructor]") {
+		FooSoA soa(foo_ilist);
+		FooSoA soa_copy(soa);
+		REQUIRE_EQUALS(soa, soa_copy);
+	}
+	SECTION("soa(soa&&)", "[constructor]") {
+		FooSoA moved_soa(foo_ilist);
+		FooSoA new_soa(std::move(moved_soa));
+		REQUIRE_EQUALS(new_soa, foo_ilist);
+		REQUIRE_EQUALS(moved_soa, std::initializer_list<Foo>{});
 	}
 
 	SECTION("push_back") {
