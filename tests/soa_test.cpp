@@ -133,4 +133,17 @@ TEST_CASE("soa<Foo>") {
 		FooSoA soa_same({ foo1, foo1 });
 		REQUIRE(soa_same[0] == soa_same[1]);
 	}
+
+	SECTION("wrapper assignment") {
+		FooSoA soa(foo_ilist);
+
+		// copy assignment
+		Foo foo4(4, "hello 4");
+		soa[1] = foo4;
+		REQUIRE((*soa[1]) == foo4);
+
+		// move assignment
+		soa[2] = std::move(foo4);
+		REQUIRE((*soa[2]) == Foo(4, "hello 4"));
+	}
 }

@@ -57,6 +57,12 @@ class soa {
 			}, value);
 			return *this;
 		}
+		_wrapper& operator=(T&& value) {
+			parent->for_each_vector([&](auto&& vec, auto&& field) {
+				vec[index] = field;
+			}, std::move(value));
+			return *this;
+		}
 
 		T operator*() const {
 			T value;
