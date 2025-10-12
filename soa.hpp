@@ -1,7 +1,6 @@
 #ifndef __SOA_HPP__
 #define __SOA_HPP__
 
-#include <array>
 #include <cstddef>
 #include <span>
 #include <vector>
@@ -9,6 +8,20 @@
 #include "reflect/reflect"
 
 namespace soa {
+
+namespace detail {
+	/// Templated metafunction to transform each of a tuple's type
+	template<template<typename> typename Transformer, typename... Ts>
+	auto transform_tuple_types(std::tuple<Ts...>) -> std::tuple<Transformer<Ts>...>;
+
+	/// Split aggregate type T into a tuple containing all its fields
+	template<typename T>
+	using to_tuple = decltype(reflect::to<std::tuple>(std::declval<T>()));
+
+	/// Tuple of vectors, one for each field of type T
+	template<typename T>
+	using fields_vector_tuple = decltype(transform_tuple_types<std::vector>(std::declval<to_tuple<T>>()));
+}
 
 template<typename T>
 class soa {
@@ -41,8 +54,8 @@ class soa {
 		_wrapper& operator=(const T& value) {
 			reflect::for_each<T>([&](auto I) {
 				auto&& field = reflect::get<I>(value);
-				auto vec = parent->template get_vector<I>();
-				(*vec)[index] = field;
+				auto&& vec = parent->template get_vector<I>();
+				vec[index] = field;
 			});
 			return *this;
 		}
@@ -50,8 +63,8 @@ class soa {
 		T operator*() const {
 			T value;
 			reflect::for_each<T>([&](auto I) {
-				auto vec = parent->template get_vector<I>();
-				reflect::get<I>(value) = (*vec)[index];
+				auto&& vec = parent->template get_vector<I>();
+				reflect::get<I>(value) = vec[index];
 			});
 			return value;
 		}
@@ -152,20 +165,16 @@ public:
 	using iterator = _iterator<soa>;
 	using const_iterator = _iterator<const soa>;
 
-	soa() {
-		reflect::for_each<T>([&](auto I) {
-			vectors[I] = new field_vector<I>;
-		});
-	}
+	soa() = default;
 	explicit soa(size_t count) {
 		reflect::for_each<T>([&](auto I) {
-			vectors[I] = new field_vector<I>(count);
+			get_vector<I>() = field_vector<I>(count);
 		});
 	}
 	soa(size_t count, const T& value) {
 		reflect::for_each<T>([&](auto I) {
 			auto&& field = reflect::get<I>(value);
-			vectors[I] = new field_vector<I>(count, field);
+			get_vector<I>() = field_vector<I>(count, field);
 		});
 	}
 	template<typename InputIt>
@@ -174,28 +183,22 @@ public:
 	}
 	soa(const soa& other) {
 		reflect::for_each<T>([&](auto I) {
-			vectors[I] = new field_vector<I>(*other.get_vector<I>());
+			get_vector<I>() = field_vector<I>(other.get_vector<I>());
 		});
 	}
 	soa(soa&& other) {
 		reflect::for_each<T>([&](auto I) {
-			vectors[I] = new field_vector<I>(std::move(*other.get_vector<I>()));
+			get_vector<I>() = field_vector<I>(std::move(other.get_vector<I>()));
 		});
 	}
 	soa(std::initializer_list<T> ilist) : soa() {
 		insert(end(), ilist);
 	}
 
-	~soa() {
-		reflect::for_each<T>([&](auto I) {
-			delete get_vector<I>();
-		});
-	}
-
 	soa& operator=(const soa& other) {
 		if (this != &other) {
 			reflect::for_each<T>([&](auto I) {
-				auto vec = get_vector<I>();
+				auto&& vec = get_vector<I>();
 				*vec = *other.get_vector<I>();
 			});
 		}
@@ -204,8 +207,8 @@ public:
 	soa& operator=(soa&& other) {
 		if (this != &other) {
 			reflect::for_each<T>([&](auto I) {
-				auto vec = get_vector<I>();
-				*vec = std::move(*other.get_vector<I>());
+				auto&& vec = get_vector<I>();
+				*vec = std::move(other.get_vector<I>());
 			});
 		}
 		return *this;
@@ -218,8 +221,8 @@ public:
 	void assign(size_t count, const T& value) {
 		reflect::for_each<T>([&](auto I) {
 			auto&& field = reflect::get<I>(value);
-			auto vec = get_vector<I>();
-			vec->assign(count, field);
+			auto&& vec = get_vector<I>();
+			vec.assign(count, field);
 		});
 	}
 	template<typename InputIt>
@@ -255,22 +258,22 @@ public:
 
 	template<size_t I>
 	auto get() {
-		return std::span(*get_vector<I>());
+		return std::span(get_vector<I>());
 	}
 
 	template<size_t I>
 	auto get() const {
-		return std::span(*get_vector<I>());
+		return std::span(get_vector<I>());
 	}
 
 	template<reflect::fixed_string FieldName>
 	auto get() {
-		return std::span(*get_vector<reflect::index_of<FieldName, T>()>());
+		return std::span(get_vector<reflect::index_of<FieldName, T>()>());
 	}
 
 	template<reflect::fixed_string FieldName>
 	auto get() const {
-		return std::span(*get_vector<reflect::index_of<FieldName, T>()>());
+		return std::span(get_vector<reflect::index_of<FieldName, T>()>());
 	}
 
 	wrapper front() {
@@ -310,40 +313,40 @@ public:
 
 	// Capacity
 	bool empty() const {
-		return get_vector<0>()->empty();
+		return get_vector<0>().empty();
 	}
 
 	size_t size() const {
-		return get_vector<0>()->size();
+		return get_vector<0>().size();
 	}
 
 	size_t max_size() const {
-		return get_vector<0>()->max_size();
+		return get_vector<0>().max_size();
 	}
 
 	void reserve(size_t new_cap) {
 		reflect::for_each<T>([&](auto I) {
-			auto vec = get_vector<I>();
-			vec->reserve(new_cap);
+			auto&& vec = get_vector<I>();
+			vec.reserve(new_cap);
 		});
 	}
 
 	size_t capacity() const {
-		return get_vector<0>()->capacity();
+		return get_vector<0>().capacity();
 	}
 
 	void shrink_to_fit() {
 		reflect::for_each<T>([&](auto I) {
-			auto vec = get_vector<I>();
-			vec->shrink_to_fit();
+			auto&& vec = get_vector<I>();
+			vec.shrink_to_fit();
 		});
 	}
 
 	// Modifiers
 	void clear() {
 		reflect::for_each<T>([&](auto I) {
-			auto vec = get_vector<I>();
-			vec->clear();
+			auto&& vec = get_vector<I>();
+			vec.clear();
 		});
 	}
 
@@ -351,8 +354,8 @@ public:
 		size_t index = pos.index;
 		reflect::for_each<T>([&](auto I) {
 			auto&& field = reflect::get<I>(value);
-			auto vec = get_vector<I>();
-			vec->insert(vec->begin() + index, field);
+			auto&& vec = get_vector<I>();
+			vec.insert(vec.begin() + index, field);
 		});
 		return iterator(this, index);
 	}
@@ -365,8 +368,8 @@ public:
 	template<typename InputIt>
 	iterator insert(const_iterator pos, InputIt first, InputIt last) {
 		size_t index = pos.index;
-		for (auto it = first; it != last; ++it) {
-			insert(pos++, *it);
+		for (auto it = first; it != last; ++it, ++pos) {
+			insert(pos, *it);
 		}
 		return iterator(this, index);
 	}
@@ -381,8 +384,8 @@ public:
 	iterator erase(const_iterator pos) {
 		size_t index = pos.index;
 		reflect::for_each<T>([&](auto I) {
-			auto vec = get_vector<I>();
-			vec->erase(vec->begin() + index);
+			auto&& vec = get_vector<I>();
+			vec.erase(vec.begin() + index);
 		});
 		return iterator(this, index);
 	}
@@ -390,8 +393,8 @@ public:
 		size_t first_index = first.index;
 		size_t last_index = last.index;
 		reflect::for_each<T>([&](auto I) {
-			auto vec = get_vector<I>();
-			vec->erase(vec->begin() + first_index, vec->begin() + last_index);
+			auto&& vec = get_vector<I>();
+			vec.erase(vec.begin() + first_index, vec.begin() + last_index);
 		});
 		return iterator(this, first_index);
 	}
@@ -399,29 +402,29 @@ public:
 	void push_back(const T& value) {
 		reflect::for_each<T>([&](auto I) {
 			auto&& field = reflect::get<I>(value);
-			auto vec = get_vector<I>();
-			vec->push_back(field);
+			auto&& vec = get_vector<I>();
+			vec.push_back(field);
 		});
 	}
 
 	void pop_back() {
 		reflect::for_each<T>([&](auto I) {
-			auto vec = get_vector<I>();
-			vec->pop_back();
+			auto&& vec = get_vector<I>();
+			vec.pop_back();
 		});
 	}
 
 	void resize(size_t count) {
 		reflect::for_each<T>([&](auto I) {
-			auto vec = get_vector<I>();
-			vec->resize(count);
+			auto&& vec = get_vector<I>();
+			vec.resize(count);
 		});
 	}
 	void resize(size_t count, const T& value) {
 		reflect::for_each<T>([&](auto I) {
 			auto&& field = reflect::get<I>(value);
-			auto vec = get_vector<I>();
-			vec->resize(count, field);
+			auto&& vec = get_vector<I>();
+			vec.resize(count, field);
 		});
 	}
 
@@ -430,19 +433,19 @@ public:
 	}
 
 private:
-	std::array<void *, reflect::size<T>()> vectors;
+	detail::fields_vector_tuple<T> vectors;
 
 	template<size_t I>
 	using field_vector = std::vector<std::remove_cvref_t<reflect::member_type<I, T>>>;
 
 	template<size_t I>
-	auto get_vector() {
-		return static_cast<field_vector<I>*>(vectors[I]);
+	auto& get_vector() {
+		return std::get<I>(vectors);
 	}
 
 	template<size_t I>
-	auto get_vector() const {
-		return static_cast<const field_vector<I>*>(vectors[I]);
+	auto& get_vector() const {
+		return std::get<I>(vectors);
 	}
 };
 
