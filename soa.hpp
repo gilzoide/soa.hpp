@@ -195,6 +195,7 @@ public:
 	}
 
 	void assign(size_t count, const T& value) {
+		clear();
 		reflect::for_each<T>([&](auto I) {
 			auto&& field = reflect::get<I>(value);
 			auto&& vec = get_vector<I>();
