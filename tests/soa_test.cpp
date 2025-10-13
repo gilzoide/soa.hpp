@@ -140,15 +140,15 @@ TEST_CASE("soa<Foo>") {
 
 	SECTION("get<>") {
 		FooSoA soa(foo_ilist);
-		REQUIRE(soa.get<"i">().size() == 3);
-		REQUIRE(soa.get<"i">()[0] == foo_array[0].i);
-		REQUIRE(soa.get<"i">()[1] == foo_array[1].i);
-		REQUIRE(soa.get<"i">()[2] == foo_array[2].i);
+		REQUIRE(soa.field<"i">().size() == 3);
+		REQUIRE(soa.field<"i">()[0] == foo_array[0].i);
+		REQUIRE(soa.field<"i">()[1] == foo_array[1].i);
+		REQUIRE(soa.field<"i">()[2] == foo_array[2].i);
 
-		REQUIRE(soa.get<"s">().size() == 3);
-		REQUIRE(soa.get<"s">()[0] == foo_array[0].s);
-		REQUIRE(soa.get<"s">()[1] == foo_array[1].s);
-		REQUIRE(soa.get<"s">()[2] == foo_array[2].s);
+		REQUIRE(soa.field<"s">().size() == 3);
+		REQUIRE(soa.field<"s">()[0] == foo_array[0].s);
+		REQUIRE(soa.field<"s">()[1] == foo_array[1].s);
+		REQUIRE(soa.field<"s">()[2] == foo_array[2].s);
 	}
 
 	SECTION("iteration") {
@@ -191,6 +191,17 @@ TEST_CASE("soa<Foo>") {
 			REQUIRE(!soa[0].value());
 			soa.push_back(Foo(1, "hello"));
 			REQUIRE(soa[1].value());
+		}
+
+		SECTION("field") {
+			FooSoA soa(foo_ilist);
+			REQUIRE(soa[0].field<"i">() == foo_array[0].i);
+			REQUIRE(soa[1].field<"i">() == foo_array[1].i);
+			REQUIRE(soa[2].field<"i">() == foo_array[2].i);
+
+			REQUIRE(soa[0].field<"s">() == foo_array[0].s);
+			REQUIRE(soa[1].field<"s">() == foo_array[1].s);
+			REQUIRE(soa[2].field<"s">() == foo_array[2].s);
 		}
 	}
 

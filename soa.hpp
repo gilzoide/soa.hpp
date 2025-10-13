@@ -32,13 +32,13 @@ class soa {
 		_wrapper(_wrapper&&) = default;
 
 		template<size_t I>
-		auto& get() {
-			return parent->template get<I>()[index];
+		auto& field() {
+			return parent->template field<I>()[index];
 		}
 
 		template<reflect::fixed_string FieldName>
-		auto& get() {
-			return parent->template get<FieldName>()[index];
+		auto& field() {
+			return parent->template field<FieldName>()[index];
 		}
 
 		T value() const {
@@ -238,25 +238,25 @@ public:
 	}
 
 	template<size_t I>
-	auto get() {
+	auto field() {
 		return std::span(get_vector<I>());
 	}
 
 	template<size_t I>
-	auto get() const {
+	auto field() const {
 		return std::span(get_vector<I>());
 	}
 
 	template<reflect::fixed_string FieldName>
-	auto get() {
+	auto field() {
 		constexpr size_t I = reflect::index_of<FieldName, T>();
-		return get<I>();
+		return field<I>();
 	}
 
 	template<reflect::fixed_string FieldName>
-	auto get() const {
+	auto field() const {
 		constexpr size_t I = reflect::index_of<FieldName, T>();
-		return get<I>();
+		return field<I>();
 	}
 
 	wrapper front() {
