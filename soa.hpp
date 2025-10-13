@@ -259,6 +259,16 @@ public:
 		return field<I>();
 	}
 
+	template<typename U>
+	auto field() {
+		return std::span(get_vector<U>());
+	}
+
+	template<typename U>
+	auto field() const {
+		return std::span(get_vector<U>());
+	}
+
 	wrapper front() {
 		return wrapper(this, 0);
 	}
@@ -412,6 +422,16 @@ private:
 	template<size_t I>
 	auto& get_vector() const {
 		return std::get<I>(vectors);
+	}
+
+	template<typename U>
+	auto& get_vector() {
+		return std::get<std::vector<U>>(vectors);
+	}
+
+	template<typename U>
+	auto& get_vector() const {
+		return std::get<std::vector<U>>(vectors);
 	}
 
 	template<typename Fn>

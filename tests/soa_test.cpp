@@ -149,6 +149,9 @@ TEST_CASE("soa<Foo>") {
 		REQUIRE(soa.field<"s">()[0] == foo_array[0].s);
 		REQUIRE(soa.field<"s">()[1] == foo_array[1].s);
 		REQUIRE(soa.field<"s">()[2] == foo_array[2].s);
+
+		REQUIRE_IT_EQUALS(soa.field<"i">(), soa.field<0>());
+		REQUIRE_IT_EQUALS(soa.field<"i">(), soa.field<int>());
 	}
 
 	SECTION("iteration") {
