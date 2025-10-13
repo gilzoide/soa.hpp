@@ -31,6 +31,24 @@ class soa {
 		_wrapper(const _wrapper&) = default;
 		_wrapper(_wrapper&&) = default;
 
+		template<size_t I>
+		auto& get() {
+			return parent->template get<I>()[index];
+		}
+
+		template<reflect::fixed_string FieldName>
+		auto& get() {
+			return parent->template get<FieldName>()[index];
+		}
+
+		T value() const {
+			T v;
+			parent->for_each_vector([&](auto&& vec, auto&& field) {
+				field = vec[index];
+			}, v);
+			return v;
+		}
+
 		bool operator==(const _wrapper& other) const {
 			if (parent == other.parent && index == other.index) {
 				// Fast path: same reference to the same index in the same parent SoA
@@ -42,7 +60,7 @@ class soa {
 			}
 		}
 		bool operator==(const T& other) const {
-			return operator*() == other;
+			return value() == other;
 		}
 		bool operator!=(const _wrapper& other) const {
 			return !operator==(other);
@@ -65,25 +83,11 @@ class soa {
 		}
 
 		T operator*() const {
-			T value;
-			parent->for_each_vector([&](auto&& vec, auto&& field) {
-				field = vec[index];
-			}, value);
-			return value;
+			return value();
 		}
 
 		operator T() const {
-			return operator*();
-		}
-
-		template<size_t I>
-		auto& get() {
-			return parent->template get<I>()[index];
-		}
-
-		template<reflect::fixed_string FieldName>
-		auto& get() {
-			return parent->template get<FieldName>()[index];
+			return value();
 		}
 
 	private:

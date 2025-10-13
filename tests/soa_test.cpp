@@ -12,6 +12,10 @@ struct Foo {
 		return i == other.i
 			&& s == other.s;
 	}
+
+	operator bool() const {
+		return i != 0 || !s.empty();
+	}
 };
 using FooSoA = soa::soa<Foo>;
 
@@ -101,6 +105,39 @@ TEST_CASE("soa<Foo>") {
 		REQUIRE(!soa.empty());
 	}
 
+	SECTION("pop_back") {
+		FooSoA soa(foo_ilist);
+		REQUIRE(soa.size() == 3);
+		soa.pop_back();
+		REQUIRE(soa.size() == 2);
+	}
+
+	SECTION("erase") {
+		FooSoA soa(foo_ilist);
+		REQUIRE(soa.size() == 3);
+		soa.erase(soa.begin());
+		REQUIRE(soa.size() == 2);
+		REQUIRE(soa[0] == foo2);
+		REQUIRE(soa[1] == foo3);
+	}
+
+	SECTION("resize") {
+		FooSoA soa(foo_ilist);
+		REQUIRE(soa.size() == 3);
+		soa.resize(1);
+		REQUIRE(soa.size() == 1);
+	}
+
+	SECTION("swap") {
+		FooSoA soa(foo_ilist);
+		FooSoA soa2;
+		REQUIRE(soa.size() == 3);
+		REQUIRE(soa2.size() == 0);
+		soa.swap(soa2);
+		REQUIRE(soa.size() == 0);
+		REQUIRE(soa2.size() == 3);
+	}
+
 	SECTION("get<>") {
 		FooSoA soa(foo_ilist);
 		REQUIRE(soa.get<"i">().size() == 3);
@@ -119,31 +156,42 @@ TEST_CASE("soa<Foo>") {
 		REQUIRE_IT_EQUALS(soa, foo_ilist);
 	}
 
-	SECTION("wrapper comparison") {
-		FooSoA soa1(foo_ilist);
-		REQUIRE(soa1[0] == soa1[0]);
-		REQUIRE(soa1[1] == soa1[1]);
-		REQUIRE(soa1[2] == soa1[2]);
+	SECTION("wrapper") {
+		SECTION("comparison") {
+			FooSoA soa1(foo_ilist);
+			REQUIRE(soa1[0] == soa1[0]);
+			REQUIRE(soa1[1] == soa1[1]);
+			REQUIRE(soa1[2] == soa1[2]);
 
-		FooSoA soa2(foo_ilist);
-		REQUIRE(soa1[0] == soa2[0]);
-		REQUIRE(soa1[1] == soa2[1]);
-		REQUIRE(soa1[2] == soa2[2]);
+			FooSoA soa2(foo_ilist);
+			REQUIRE(soa1[0] == soa2[0]);
+			REQUIRE(soa1[1] == soa2[1]);
+			REQUIRE(soa1[2] == soa2[2]);
 
-		FooSoA soa_same({ foo1, foo1 });
-		REQUIRE(soa_same[0] == soa_same[1]);
+			FooSoA soa_same({ foo1, foo1 });
+			REQUIRE(soa_same[0] == soa_same[1]);
+		}
+
+		SECTION("assignment") {
+			FooSoA soa(foo_ilist);
+
+			// copy assignment
+			Foo foo4(4, "hello 4");
+			soa[1] = foo4;
+			REQUIRE(soa[1] == foo4);
+
+			// move assignment
+			soa[2] = std::move(foo4);
+			REQUIRE(soa[2] == Foo(4, "hello 4"));
+		}
+
+		SECTION("operator bool") {
+			FooSoA soa;
+			soa.push_back(Foo());
+			REQUIRE(!soa[0].value());
+			soa.push_back(Foo(1, "hello"));
+			REQUIRE(soa[1].value());
+		}
 	}
 
-	SECTION("wrapper assignment") {
-		FooSoA soa(foo_ilist);
-
-		// copy assignment
-		Foo foo4(4, "hello 4");
-		soa[1] = foo4;
-		REQUIRE((*soa[1]) == foo4);
-
-		// move assignment
-		soa[2] = std::move(foo4);
-		REQUIRE((*soa[2]) == Foo(4, "hello 4"));
-	}
 }
