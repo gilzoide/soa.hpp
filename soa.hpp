@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <span>
+#include <utility>
 #include <vector>
 
 #include "reflect/reflect"
@@ -23,29 +24,99 @@ namespace detail {
 	using fields_vector_tuple = decltype(transform_tuple_types<std::vector>(std::declval<to_tuple<T>>()));
 }
 
+/**
+ * Structure of Arrays (SoA) container for aggregate type T.
+ *
+ * Each field of T is stored in a separate std::vector, allowing for better data locality and cache performance.
+ * It provides an API similar to std::vector, allowing for easy manipulation of the data including usage of STL algorithms.
+ * Individual elements can be accessed and modified through a proxy object that provides access to the underlying fields.
+ */
 template<typename T>
 class soa {
+	/**
+	 * Wrapper around a reference to an element of the SoA.
+	 * Accessing `field` return a reference to the original field in the SoA, so it can be modified directly.
+	 * Accessing `value` or `operator*` constructs a new value from all fields that are stored separately in the parent SoA.
+	 * It is possible to assign a new value to all underlying fields of the parent SoA at once using `soa[i] = value`.
+	 */
 	template<typename _soa>
 	struct _wrapper {
 		_wrapper(_soa *parent, size_t index) : parent(parent), index(index) {}
 		_wrapper(const _wrapper&) = default;
 		_wrapper(_wrapper&&) = default;
 
+		/**
+		 * Access the underlying field of the element of the SoA by index.
+		 *
+		 * @code
+		 * auto x = soa[i].field<0>();
+		 * soa[i].field<0>() = x;
+		 * @endcode
+		 */
 		template<size_t I>
 		auto& field() {
 			return parent->template field<I>()[index];
 		}
+		template<size_t I>
+		auto& field() const {
+			return parent->template field<I>()[index];
+		}
 
+		/**
+		 * Access the underlying field of the element of the SoA by name.
+		 *
+		 * @code
+		 * auto x = soa[i].field<"x">();
+		 * soa[i].field<"x">() = x;
+		 * @endcode
+		 */
 		template<reflect::fixed_string FieldName>
 		auto& field() {
 			return parent->template field<FieldName>()[index];
 		}
+		template<reflect::fixed_string FieldName>
+		auto& field() const {
+			return parent->template field<FieldName>()[index];
+		}
 
+		/**
+		 * Access the underlying field of the element of the SoA by type.
+		 * Only works if the type is unique within the aggregate type T.
+		 *
+		 * @code
+		 * auto x = soa[i].field<int>();
+		 * soa[i].field<int>() = x;
+		 * @endcode
+		 */
+		template<typename U>
+		auto& field() {
+			return parent->template field<U>()[index];
+		}
+		template<typename U>
+		auto& field() const {
+			return parent->template field<U>()[index];
+		}
+
+		/**
+		 * Access all underlying fields of the element of the SoA as a tuple.
+		 *
+		 * @code
+		 * auto [x, y, z] = soa[i].fields();
+		 * std::tie(x, y, z) = soa[i].fields();
+		 * @endcode
+		 */
+		auto fields() {
+			return parent->fields(index);
+		}
+		auto fields() const {
+			return parent->fields(index);
+		}
+
+		/**
+		 * Construct a new value from all fields of the element of the SoA.
+		 */
 		T value() const {
-			T v;
-			parent->for_each_vector([&](auto&& vec, auto&& field) {
-				field = vec[index];
-			}, v);
+			T v = std::make_from_tuple<T>(fields());
 			return v;
 		}
 
@@ -69,12 +140,26 @@ class soa {
 			return !operator==(other);
 		}
 
+		/**
+		 * Assign `value`'s fields to an element of the SoA.
+		 *
+		 * @code
+		 * soa[i] = T{ ... };
+		 * @endcode
+		 */
 		_wrapper& operator=(const T& value) {
 			parent->for_each_vector([&](auto&& vec, auto&& field) {
 				vec[index] = field;
 			}, value);
 			return *this;
 		}
+		/**
+		 * Assign `value`'s fields to an element of the SoA.
+		 *
+		 * @code
+		 * soa[i] = T{ ... };
+		 * @endcode
+		 */
 		_wrapper& operator=(T&& value) {
 			parent->for_each_vector([&](auto&& vec, auto&& field) {
 				vec[index] = field;
@@ -82,10 +167,16 @@ class soa {
 			return *this;
 		}
 
+		/**
+		 * Alias for `value`.
+		 */
 		T operator*() const {
 			return value();
 		}
 
+		/**
+		 * Alias for `value`.
+		 */
 		operator T() const {
 			return value();
 		}
@@ -418,7 +509,6 @@ private:
 	auto& get_vector() {
 		return std::get<I>(vectors);
 	}
-
 	template<size_t I>
 	auto& get_vector() const {
 		return std::get<I>(vectors);
@@ -428,7 +518,6 @@ private:
 	auto& get_vector() {
 		return std::get<std::vector<U>>(vectors);
 	}
-
 	template<typename U>
 	auto& get_vector() const {
 		return std::get<std::vector<U>>(vectors);
@@ -440,7 +529,6 @@ private:
 			fn(get_vector<I>());
 		});
 	}
-
 	template<typename Fn>
 	void for_each_vector(Fn&& fn) const {
 		reflect::for_each<T>([&](auto I) {
@@ -455,13 +543,23 @@ private:
 			fn(get_vector<I>(), field);
 		});
 	}
-
 	template<typename Fn, typename U>
 	void for_each_vector(Fn&& fn, U&& value) const {
 		reflect::for_each<T>([&](auto I) {
 			auto&& field = reflect::get<I>(value);
 			fn(get_vector<I>(), field);
 		});
+	}
+
+	auto fields(size_t index) {
+		return [&]<auto... Ns>(std::index_sequence<Ns...>) {
+			return std::forward_as_tuple(std::get<Ns>(vectors)[index]...);
+		}(std::make_index_sequence<reflect::size<std::remove_cvref_t<T>>()>{});
+	}
+	auto fields(size_t index) const {
+		return [&]<auto... Ns>(std::index_sequence<Ns...>) {
+			return std::forward_as_tuple(std::get<Ns>(vectors)[index]...);
+		}(std::make_index_sequence<reflect::size<std::remove_cvref_t<T>>()>{});
 	}
 };
 
