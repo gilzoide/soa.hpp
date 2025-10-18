@@ -42,8 +42,6 @@ class soa {
 	template<typename _soa>
 	struct _wrapper {
 		_wrapper(_soa *parent, size_t index) : parent(parent), index(index) {}
-		_wrapper(const _wrapper&) = default;
-		_wrapper(_wrapper&&) = default;
 
 		/**
 		 * Access the underlying field of the element of the SoA by index.
@@ -181,18 +179,28 @@ class soa {
 			return value();
 		}
 
+		void swap(_wrapper other) {
+			[&]<auto... Ns>(std::index_sequence<Ns...>) {
+				using std::swap;
+				(swap(field<Ns>(), other.field<Ns>()), ...);
+			}(std::make_index_sequence<reflect::size<std::remove_cvref_t<T>>()>{});
+		}
+
 	private:
 		_soa *parent;
 		size_t index;
 	};
 
 	template<typename _soa>
+	friend void swap(_wrapper<_soa> a, _wrapper<_soa> b) {
+		a.swap(b);
+	}
+
+	template<typename _soa>
 	struct _iterator {
 		using _const_soa = const std::remove_const_t<_soa>;
 
 		_iterator(_soa *parent, size_t index) : parent(parent), index(index) {}
-		_iterator(const _iterator&) = default;
-		_iterator(_iterator&&) = default;
 
 		_iterator& operator++() {
 			++index;

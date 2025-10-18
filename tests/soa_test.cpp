@@ -208,4 +208,11 @@ TEST_CASE("soa<Foo>") {
 		}
 	}
 
+	SECTION("swap") {
+		FooSoA soa(foo_ilist);
+		using std::swap;
+		swap(soa[0], soa[1]);
+		REQUIRE(soa[0] == foo2);
+		REQUIRE(soa[1] == foo1);
+	}
 }
