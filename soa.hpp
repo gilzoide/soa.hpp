@@ -212,6 +212,11 @@ class soa {
 			return previous;
 		}
 
+		_iterator& operator+=(size_t n) {
+			index += n;
+			return *this;
+		}
+
 		_iterator& operator--() {
 			--index;
 			return *this;
@@ -222,12 +227,23 @@ class soa {
 			return previous;
 		}
 
+		_iterator& operator-=(size_t n) {
+			index -= n;
+			return *this;
+		}
+
 		_iterator operator+(size_t n) const {
 			return _iterator(parent, index + n);
+		}
+		size_t operator+(const _iterator& other) const {
+			return index + other.index;
 		}
 
 		_iterator operator-(size_t n) const {
 			return _iterator(parent, index - n);
+		}
+		size_t operator-(const _iterator& other) const {
+			return index - other.index;
 		}
 
 		bool operator==(const _iterator& other) const {
