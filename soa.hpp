@@ -261,16 +261,6 @@ class soa {
 			return _wrapper<_const_soa>(parent, index);
 		}
 
-		template<size_t I>
-		auto& get() {
-			return parent->template get<I>()[index];
-		}
-
-		template<reflect::fixed_string FieldName>
-		auto& get() {
-			return parent->template get<FieldName>()[index];
-		}
-
 		operator _iterator<_const_soa>() const {
 			return _iterator<_const_soa>(parent, index);
 		}
@@ -356,7 +346,6 @@ public:
 	auto field() {
 		return std::span(get_vector<I>());
 	}
-
 	template<size_t I>
 	auto field() const {
 		return std::span(get_vector<I>());
@@ -367,7 +356,6 @@ public:
 		constexpr size_t I = reflect::index_of<FieldName, T>();
 		return field<I>();
 	}
-
 	template<reflect::fixed_string FieldName>
 	auto field() const {
 		constexpr size_t I = reflect::index_of<FieldName, T>();
@@ -378,7 +366,6 @@ public:
 	auto field() {
 		return std::span(get_vector<U>());
 	}
-
 	template<typename U>
 	auto field() const {
 		return std::span(get_vector<U>());
