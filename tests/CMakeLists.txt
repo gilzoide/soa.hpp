@@ -1,8 +1,13 @@
 add_subdirectory(Catch2)
 set_target_properties(Catch2 PROPERTIES CXX_STANDARD 17)
 
-add_executable(soa_test soa_test.cpp)
-target_link_libraries(soa_test soa.hpp Catch2::Catch2WithMain)
-set_target_properties(soa_test PROPERTIES CXX_STANDARD 20)
+function(run_test source)
+  get_filename_component(test_name ${source} NAME_WE)
+  add_executable(${test_name} ${source})
+  target_compile_features(${test_name} PRIVATE cxx_std_20)
+  target_link_libraries(${test_name} soa.hpp Catch2::Catch2WithMain)
+  add_test(NAME ${test_name} COMMAND ${test_name} ${ARGN})
+endfunction()
 
-add_test(NAME test COMMAND soa_test)
+run_test("soa_test.cpp")
+run_test("readme_test.cpp")
