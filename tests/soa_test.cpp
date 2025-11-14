@@ -175,7 +175,7 @@ TEST_CASE("soa<Foo>") {
 			REQUIRE(soa_same[0] == soa_same[1]);
 		}
 
-		SECTION("assignment") {
+		SECTION("assignment(T)") {
 			FooSoA soa(foo_ilist);
 
 			// copy assignment
@@ -186,6 +186,12 @@ TEST_CASE("soa<Foo>") {
 			// move assignment
 			soa[2] = std::move(foo4);
 			REQUIRE(soa[2] == Foo(4, "hello 4"));
+		}
+
+		SECTION("assignment(wrapper)") {
+			FooSoA soa(foo_ilist);
+			soa[1] = soa[2];
+			REQUIRE(soa[1] == soa[2]);
 		}
 
 		SECTION("operator bool") {

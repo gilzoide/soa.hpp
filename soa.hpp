@@ -151,17 +151,22 @@ class soa {
 			}, value);
 			return *this;
 		}
-		/**
-		 * Assign `value`'s fields to an element of the SoA.
-		 *
-		 * @code
-		 * soa[i] = T{ ... };
-		 * @endcode
-		 */
 		_wrapper& operator=(T&& value) {
 			parent->for_each_vector([&](auto&& vec, auto&& field) {
 				vec[index] = field;
 			}, std::move(value));
+			return *this;
+		}
+
+		/**
+		 * Assign `value`'s fields to an element of the SoA.
+		 *
+		 * @code
+		 * soa[i] = soa[j];
+		 * @endcode
+		 */
+		_wrapper& operator=(const _wrapper& value) {
+			fields() = value.fields();
 			return *this;
 		}
 
@@ -179,11 +184,18 @@ class soa {
 			return value();
 		}
 
+		/**
+		 * Swap field values of two wrappers.
+		 *
+		 * @code
+		 * soa[i].swap(soa[j]);
+		 * @endcode
+		 */
 		void swap(_wrapper other) {
 			[&]<auto... Ns>(std::index_sequence<Ns...>) {
 				using std::swap;
 				(swap(field<Ns>(), other.field<Ns>()), ...);
-			}(std::make_index_sequence<reflect::size<std::remove_cvref_t<T>>()>{});
+			}(std::make_index_sequence<reflect::size<T>()>{});
 		}
 
 	private:
@@ -191,6 +203,13 @@ class soa {
 		size_t index;
 	};
 
+	/**
+	 * Swap field values of two wrappers.
+	 *
+	 * @code
+	 * swap(soa[i], soa[j]);
+	 * @endcode
+	 */
 	template<typename _soa>
 	friend void swap(_wrapper<_soa> a, _wrapper<_soa> b) {
 		a.swap(b);
