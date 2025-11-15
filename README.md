@@ -1,5 +1,5 @@
 # soa.hpp
-[Struct of Arrays (SoA)](https://en.wikipedia.org/wiki/AoS_and_SoA#Structure_of_arrays) container template for C++20 that uses compile-time reflection to provide access to underlying fields by name.
+[Struct of Arrays (SoA)](https://en.wikipedia.org/wiki/AoS_and_SoA#Structure_of_arrays) container template for C++20 that uses compile-time reflection to iterate over existing fields and access fields by name.
 
 
 ## Features

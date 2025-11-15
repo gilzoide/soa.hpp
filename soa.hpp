@@ -42,13 +42,15 @@ namespace detail {
 		return std::span((const union_to_bool<T> *) v.data(), v.size());
 	}
 
-	/// Split aggregate type T into a tuple containing all its fields
-	template<typename T>
-	using to_tuple = decltype(reflect::to<std::tuple>(std::declval<T>()));
-
 	/// Tuple of vectors, one for each field of type T
 	template<typename T>
-	using fields_vector_tuple = decltype(transform_tuple_types<std::vector>(transform_tuple_types<bool_to_union>(std::declval<to_tuple<T>>())));
+	using fields_vector_tuple = decltype(
+		transform_tuple_types<std::vector>(
+			transform_tuple_types<bool_to_union>(
+				reflect::to<std::tuple>(std::declval<T>())
+			)
+		)
+	);
 }
 
 /**
