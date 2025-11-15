@@ -15,13 +15,40 @@ namespace detail {
 	template<template<typename> typename Transformer, typename... Ts>
 	auto transform_tuple_types(std::tuple<Ts...>) -> std::tuple<Transformer<Ts>...>;
 
+	/// Union used to workaround std::vector<bool> specialization
+	union union_bool {
+		bool value;
+
+		union_bool() : value(false) {}
+		union_bool(bool value) : value(value) {}
+		operator bool() const { return value; }
+	};
+
+	/// Convert bool -> union_bool
+	template<typename T>
+	using bool_to_union = std::conditional_t<std::is_same_v<std::remove_cv_t<T>, bool>, union_bool, T>;
+
+	/// Convert union_bool -> bool
+	template<typename T>
+	using union_to_bool = std::conditional_t<std::is_same_v<std::remove_cv_t<T>, union_bool>, bool, T>;
+
+	/// Get a span from a vector, converting union_bool -> bool
+	template<typename T>
+	auto vector_to_span(std::vector<T>& v) {
+		return std::span((union_to_bool<T> *) v.data(), v.size());
+	}
+	template<typename T>
+	auto vector_to_span(const std::vector<T>& v) {
+		return std::span((const union_to_bool<T> *) v.data(), v.size());
+	}
+
 	/// Split aggregate type T into a tuple containing all its fields
 	template<typename T>
 	using to_tuple = decltype(reflect::to<std::tuple>(std::declval<T>()));
 
 	/// Tuple of vectors, one for each field of type T
 	template<typename T>
-	using fields_vector_tuple = decltype(transform_tuple_types<std::vector>(std::declval<to_tuple<T>>()));
+	using fields_vector_tuple = decltype(transform_tuple_types<std::vector>(transform_tuple_types<bool_to_union>(std::declval<to_tuple<T>>())));
 }
 
 /**
@@ -363,11 +390,11 @@ public:
 
 	template<size_t I>
 	auto field() {
-		return std::span(get_vector<I>());
+		return detail::vector_to_span(get_vector<I>());
 	}
 	template<size_t I>
 	auto field() const {
-		return std::span(get_vector<I>());
+		return detail::vector_to_span(get_vector<I>());
 	}
 
 	template<reflect::fixed_string FieldName>
@@ -383,11 +410,11 @@ public:
 
 	template<typename U>
 	auto field() {
-		return std::span(get_vector<U>());
+		return detail::vector_to_span(get_vector<detail::bool_to_union<U>>());
 	}
 	template<typename U>
 	auto field() const {
-		return std::span(get_vector<U>());
+		return detail::vector_to_span(get_vector<detail::bool_to_union<U>>());
 	}
 
 	wrapper front() {

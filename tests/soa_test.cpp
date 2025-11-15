@@ -8,13 +8,10 @@ struct Foo {
 	int i = 0;
 	std::string s = "";
 
-	bool operator==(const Foo& other) const {
-		return i == other.i
-			&& s == other.s;
-	}
+	bool operator==(const Foo& other) const = default;
 
 	operator bool() const {
-		return i != 0 || !s.empty();
+		return i && !s.empty();
 	}
 };
 using FooSoA = soa::soa<Foo>;

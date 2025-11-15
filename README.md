@@ -1,5 +1,5 @@
 # soa.hpp
-[Struct of Arrays (SoA)](https://en.wikipedia.org/wiki/AoS_and_SoA#Structure_of_arrays) container template that uses compile-time reflection to provide access to underlying fields by name.
+[Struct of Arrays (SoA)](https://en.wikipedia.org/wiki/AoS_and_SoA#Structure_of_arrays) container template for C++20 that uses compile-time reflection to provide access to underlying fields by name.
 
 
 ## Features
@@ -88,6 +88,6 @@ int main() {
 ## Integrating with CMake
 You can integrate soa.hpp with CMake targets by adding a copy of this repository and linking with the `soa.hpp` target:
 ```cmake
-add_subdirectory(path/to/soa.hpp)
+add_subdirectory("path/to/soa.hpp")
 target_link_libraries(my_awesome_target soa.hpp)
 ```
