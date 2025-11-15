@@ -60,266 +60,12 @@ namespace detail {
  */
 template<typename T>
 class soa {
-	/**
-	 * Wrapper around a reference to an element of the SoA.
-	 * Accessing `field` return a reference to the original field in the SoA, so it can be modified directly.
-	 * Accessing `value` or `operator*` constructs a new value from all fields that are stored separately in the parent SoA.
-	 * It is possible to assign a new value to all underlying fields of the parent SoA at once using `soa[i] = value`.
-	 */
-	template<typename _soa>
-	struct _wrapper {
-		_wrapper(_soa *parent, size_t index) : parent(parent), index(index) {}
-
-		/**
-		 * Access the underlying field of the element of the SoA by index.
-		 *
-		 * @code
-		 * auto x = soa[i].field<0>();
-		 * soa[i].field<0>() = x;
-		 * @endcode
-		 */
-		template<size_t I>
-		auto& field() {
-			return parent->template field<I>()[index];
-		}
-		template<size_t I>
-		auto& field() const {
-			return parent->template field<I>()[index];
-		}
-
-		/**
-		 * Access the underlying field of the element of the SoA by name.
-		 *
-		 * @code
-		 * auto x = soa[i].field<"x">();
-		 * soa[i].field<"x">() = x;
-		 * @endcode
-		 */
-		template<reflect::fixed_string FieldName>
-		auto& field() {
-			return parent->template field<FieldName>()[index];
-		}
-		template<reflect::fixed_string FieldName>
-		auto& field() const {
-			return parent->template field<FieldName>()[index];
-		}
-
-		/**
-		 * Access the underlying field of the element of the SoA by type.
-		 * Only works if the type is unique within the aggregate type T.
-		 *
-		 * @code
-		 * auto x = soa[i].field<int>();
-		 * soa[i].field<int>() = x;
-		 * @endcode
-		 */
-		template<typename U>
-		auto& field() {
-			return parent->template field<U>()[index];
-		}
-		template<typename U>
-		auto& field() const {
-			return parent->template field<U>()[index];
-		}
-
-		/**
-		 * Access all underlying fields of the element of the SoA as a tuple.
-		 *
-		 * @code
-		 * auto [x, y, z] = soa[i].fields();
-		 * std::tie(x, y, z) = soa[i].fields();
-		 * @endcode
-		 */
-		auto fields() {
-			return parent->fields(index);
-		}
-		auto fields() const {
-			return parent->fields(index);
-		}
-
-		/**
-		 * Construct a new value from all fields of the element of the SoA.
-		 */
-		T value() const {
-			T v = std::make_from_tuple<T>(fields());
-			return v;
-		}
-
-		bool operator==(const _wrapper& other) const {
-			if (parent == other.parent && index == other.index) {
-				// Fast path: same reference to the same index in the same parent SoA
-				return true;
-			}
-			else {
-				// Slow path: compare by value
-				return operator==(*other);
-			}
-		}
-		bool operator==(const T& other) const {
-			return value() == other;
-		}
-		bool operator!=(const _wrapper& other) const {
-			return !operator==(other);
-		}
-		bool operator!=(const T& other) const {
-			return !operator==(other);
-		}
-
-		/**
-		 * Assign `value`'s fields to an element of the SoA.
-		 *
-		 * @code
-		 * soa[i] = T{ ... };
-		 * @endcode
-		 */
-		_wrapper& operator=(const T& value) {
-			parent->for_each_vector([&](auto&& vec, auto&& field) {
-				vec[index] = field;
-			}, value);
-			return *this;
-		}
-		_wrapper& operator=(T&& value) {
-			parent->for_each_vector([&](auto&& vec, auto&& field) {
-				vec[index] = field;
-			}, std::move(value));
-			return *this;
-		}
-
-		/**
-		 * Assign `value`'s fields to an element of the SoA.
-		 *
-		 * @code
-		 * soa[i] = soa[j];
-		 * @endcode
-		 */
-		_wrapper& operator=(const _wrapper& value) {
-			fields() = value.fields();
-			return *this;
-		}
-
-		/**
-		 * Alias for `value`.
-		 */
-		T operator*() const {
-			return value();
-		}
-
-		/**
-		 * Alias for `value`.
-		 */
-		operator T() const {
-			return value();
-		}
-
-		/**
-		 * Swap field values of two wrappers.
-		 *
-		 * @code
-		 * soa[i].swap(soa[j]);
-		 * @endcode
-		 */
-		void swap(_wrapper other) {
-			[&]<auto... Ns>(std::index_sequence<Ns...>) {
-				using std::swap;
-				(swap(field<Ns>(), other.field<Ns>()), ...);
-			}(std::make_index_sequence<reflect::size<T>()>{});
-		}
-
-	private:
-		_soa *parent;
-		size_t index;
-	};
-
-	/**
-	 * Swap field values of two wrappers.
-	 *
-	 * @code
-	 * swap(soa[i], soa[j]);
-	 * @endcode
-	 */
-	template<typename _soa>
-	friend void swap(_wrapper<_soa> a, _wrapper<_soa> b) {
-		a.swap(b);
-	}
-
-	template<typename _soa>
-	struct _iterator {
-		using _const_soa = const std::remove_const_t<_soa>;
-
-		_iterator(_soa *parent, size_t index) : parent(parent), index(index) {}
-
-		_iterator& operator++() {
-			++index;
-			return *this;
-		}
-		_iterator operator++(int) {
-			_iterator previous = *this;
-			++index;
-			return previous;
-		}
-
-		_iterator& operator+=(size_t n) {
-			index += n;
-			return *this;
-		}
-
-		_iterator& operator--() {
-			--index;
-			return *this;
-		}
-		_iterator operator--(int) {
-			_iterator previous = *this;
-			--index;
-			return previous;
-		}
-
-		_iterator& operator-=(size_t n) {
-			index -= n;
-			return *this;
-		}
-
-		_iterator operator+(size_t n) const {
-			return _iterator(parent, index + n);
-		}
-		size_t operator+(const _iterator& other) const {
-			return index + other.index;
-		}
-
-		_iterator operator-(size_t n) const {
-			return _iterator(parent, index - n);
-		}
-		size_t operator-(const _iterator& other) const {
-			return index - other.index;
-		}
-
-		bool operator==(const _iterator& other) const {
-			return parent == other.parent
-				&& index == other.index;
-		}
-		bool operator!=(const _iterator& other) const {
-			return !operator==(other);
-		}
-
-		_wrapper<_soa> operator*() {
-			return _wrapper<_soa>(parent, index);
-		}
-		_wrapper<_const_soa> operator*() const {
-			return _wrapper<_const_soa>(parent, index);
-		}
-
-		operator _iterator<_const_soa>() const {
-			return _iterator<_const_soa>(parent, index);
-		}
-
-	private:
-		friend class soa;
-		_soa *parent;
-		size_t index;
-	};
+	template<typename _soa> struct _reference;
+	template<typename _soa> struct _iterator;
 
 public:
-	using wrapper = _wrapper<soa>;
-	using const_wrapper = _wrapper<const soa>;
+	using reference = _reference<soa>;
+	using const_reference = _reference<const soa>;
 	using iterator = _iterator<soa>;
 	using const_iterator = _iterator<const soa>;
 
@@ -368,24 +114,24 @@ public:
 	}
 
 	// Element access
-	wrapper at(size_t index) {
+	reference at(size_t index) {
 		if (index >= size()) {
 			throw std::out_of_range("Index out of range");
 		}
-		return wrapper(this, index);
+		return reference(this, index);
 	}
-	const_wrapper at(size_t index) const {
+	const_reference at(size_t index) const {
 		if (index >= size()) {
 			throw std::out_of_range("Index out of range");
 		}
-		return const_wrapper(this, index);
+		return const_reference(this, index);
 	}
 
-	wrapper operator[](size_t index) {
-		return wrapper(this, index);
+	reference operator[](size_t index) {
+		return reference(this, index);
 	}
-	const_wrapper operator[](size_t index) const {
-		return const_wrapper(this, index);
+	const_reference operator[](size_t index) const {
+		return const_reference(this, index);
 	}
 
 	template<size_t I>
@@ -417,18 +163,18 @@ public:
 		return detail::vector_to_span(get_vector<detail::bool_to_union<U>>());
 	}
 
-	wrapper front() {
-		return wrapper(this, 0);
+	reference front() {
+		return reference(this, 0);
 	}
-	const_wrapper front() const {
-		return const_wrapper(this, 0);
+	const_reference front() const {
+		return const_reference(this, 0);
 	}
 
-	wrapper back() {
-		return wrapper(this, size() - 1);
+	reference back() {
+		return reference(this, size() - 1);
 	}
-	const_wrapper back() const {
-		return const_wrapper(this, size() - 1);
+	const_reference back() const {
+		return const_reference(this, size() - 1);
 	}
 
 	// Iterators
@@ -618,6 +364,263 @@ private:
 			return std::forward_as_tuple(std::get<Ns>(vectors)[index]...);
 		}(std::make_index_sequence<reflect::size<std::remove_cvref_t<T>>()>{});
 	}
+
+	/**
+	 * Reference to an element of the SoA.
+	 * Accessing `field` return a reference to the original field in the SoA, so it can be modified directly.
+	 * Accessing `value` or `operator*` constructs a new value from all fields that are stored separately in the parent SoA.
+	 * It is possible to assign a new value to all underlying fields of the parent SoA at once using `soa[i] = value`.
+	 */
+	template<typename _soa>
+	struct _reference {
+		_reference(_soa *parent, size_t index) : parent(parent), index(index) {}
+
+		/**
+		 * Access the underlying field of the element of the SoA by index.
+		 *
+		 * @code
+		 * auto x = soa[i].field<0>();
+		 * soa[i].field<0>() = x;
+		 * @endcode
+		 */
+		template<size_t I>
+		auto& field() {
+			return parent->template field<I>()[index];
+		}
+		template<size_t I>
+		auto& field() const {
+			return parent->template field<I>()[index];
+		}
+
+		/**
+		 * Access the underlying field of the element of the SoA by name.
+		 *
+		 * @code
+		 * auto x = soa[i].field<"x">();
+		 * soa[i].field<"x">() = x;
+		 * @endcode
+		 */
+		template<reflect::fixed_string FieldName>
+		auto& field() {
+			return parent->template field<FieldName>()[index];
+		}
+		template<reflect::fixed_string FieldName>
+		auto& field() const {
+			return parent->template field<FieldName>()[index];
+		}
+
+		/**
+		 * Access the underlying field of the element of the SoA by type.
+		 * Only works if the type is unique within the aggregate type T.
+		 *
+		 * @code
+		 * auto x = soa[i].field<int>();
+		 * soa[i].field<int>() = x;
+		 * @endcode
+		 */
+		template<typename U>
+		auto& field() {
+			return parent->template field<U>()[index];
+		}
+		template<typename U>
+		auto& field() const {
+			return parent->template field<U>()[index];
+		}
+
+		/**
+		 * Access all underlying fields of the element of the SoA as a tuple.
+		 *
+		 * @code
+		 * auto [x, y, z] = soa[i].fields();
+		 * std::tie(x, y, z) = soa[i].fields();
+		 * @endcode
+		 */
+		auto fields() {
+			return parent->fields(index);
+		}
+		auto fields() const {
+			return parent->fields(index);
+		}
+
+		/**
+		 * Construct a new value from all fields of the element of the SoA.
+		 */
+		T value() const {
+			T v = std::make_from_tuple<T>(fields());
+			return v;
+		}
+
+		bool operator==(const _reference& other) const {
+			if (parent == other.parent && index == other.index) {
+				// Fast path: same reference to the same index in the same parent SoA
+				return true;
+			}
+			else {
+				// Slow path: compare by value
+				return operator==(*other);
+			}
+		}
+		bool operator==(const T& other) const {
+			return value() == other;
+		}
+		bool operator!=(const _reference& other) const {
+			return !operator==(other);
+		}
+		bool operator!=(const T& other) const {
+			return !operator==(other);
+		}
+
+		/**
+		 * Assign `value`'s fields to an element of the SoA.
+		 *
+		 * @code
+		 * soa[i] = T{ ... };
+		 * @endcode
+		 */
+		_reference& operator=(const T& value) {
+			parent->for_each_vector([&](auto&& vec, auto&& field) {
+				vec[index] = field;
+			}, value);
+			return *this;
+		}
+		_reference& operator=(T&& value) {
+			parent->for_each_vector([&](auto&& vec, auto&& field) {
+				vec[index] = field;
+			}, std::move(value));
+			return *this;
+		}
+
+		/**
+		 * Assign `value`'s fields to an element of the SoA.
+		 *
+		 * @code
+		 * soa[i] = soa[j];
+		 * @endcode
+		 */
+		_reference& operator=(const _reference& value) {
+			fields() = value.fields();
+			return *this;
+		}
+
+		/**
+		 * Alias for `value`.
+		 */
+		T operator*() const {
+			return value();
+		}
+
+		/**
+		 * Alias for `value`.
+		 */
+		operator T() const {
+			return value();
+		}
+
+		/**
+		 * Swap field values of two wrappers.
+		 *
+		 * @code
+		 * soa[i].swap(soa[j]);
+		 * @endcode
+		 */
+		void swap(_reference other) {
+			[&]<auto... Ns>(std::index_sequence<Ns...>) {
+				using std::swap;
+				(swap(field<Ns>(), other.field<Ns>()), ...);
+			}(std::make_index_sequence<reflect::size<T>()>{});
+		}
+
+	private:
+		_soa *parent;
+		size_t index;
+	};
+
+	/**
+	 * Swap field values of two wrappers.
+	 *
+	 * @code
+	 * swap(soa[i], soa[j]);
+	 * @endcode
+	 */
+	template<typename _soa>
+	friend void swap(_reference<_soa> a, _reference<_soa> b) {
+		a.swap(b);
+	}
+
+	template<typename _soa>
+	struct _iterator {
+		using _const_soa = const std::remove_const_t<_soa>;
+
+		_iterator(_soa *parent, size_t index) : parent(parent), index(index) {}
+
+		_iterator& operator++() {
+			++index;
+			return *this;
+		}
+		_iterator operator++(int) {
+			_iterator previous = *this;
+			++index;
+			return previous;
+		}
+
+		_iterator& operator+=(size_t n) {
+			index += n;
+			return *this;
+		}
+
+		_iterator& operator--() {
+			--index;
+			return *this;
+		}
+		_iterator operator--(int) {
+			_iterator previous = *this;
+			--index;
+			return previous;
+		}
+
+		_iterator& operator-=(size_t n) {
+			index -= n;
+			return *this;
+		}
+
+		_iterator operator+(size_t n) const {
+			return _iterator(parent, index + n);
+		}
+		size_t operator+(const _iterator& other) const {
+			return index + other.index;
+		}
+
+		_iterator operator-(size_t n) const {
+			return _iterator(parent, index - n);
+		}
+		size_t operator-(const _iterator& other) const {
+			return index - other.index;
+		}
+
+		bool operator==(const _iterator& other) const {
+			return parent == other.parent
+				&& index == other.index;
+		}
+		bool operator!=(const _iterator& other) const {
+			return !operator==(other);
+		}
+
+		_reference<_soa> operator*() {
+			return _reference<_soa>(parent, index);
+		}
+		_reference<_const_soa> operator*() const {
+			return _reference<_const_soa>(parent, index);
+		}
+
+		operator _iterator<_const_soa>() const {
+			return _iterator<_const_soa>(parent, index);
+		}
+
+	private:
+		friend class soa;
+		_soa *parent;
+		size_t index;
+	};
 };
 
 }
